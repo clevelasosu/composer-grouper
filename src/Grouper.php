@@ -3,6 +3,7 @@
 
 namespace OSUCOE\Grouper;
 
+use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
 
@@ -13,6 +14,8 @@ class Grouper
      * @var Client
      */
     protected $client;
+    public $timeout = 5;
+    public $maxAttempts = 3;
 
     public function __construct(Client $client)
     {
@@ -29,15 +32,12 @@ class Grouper
     protected function request($url, $method, $body=null) {
 
         $attempts = 0;
-        $maxAttempts = 3;
-        $timeout = 5;
-
         do {
             try {
 
                 $response = $this->client->request($method, $url, [
                     'body' => $body,
-                    'timeout' => $timeout,
+                    'timeout' => $this->timeout,
                     'headers' => [
                         'Content-Type' => 'application/json',
                     ],
@@ -45,13 +45,13 @@ class Grouper
             } catch (ConnectException $e) {
                 // Attempt to handle timeouts
                 $attempts++;
-                if ($attempts == $maxAttempts) {
+                if ($attempts == $this->maxAttempts) {
                     throw new GrouperException("Connection Error to Grouper", 0, $e);
                 } else {
                     // repeat the do loop
                     continue;
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 throw new GrouperException("Unexpected Error to Grouper", 0, $e);
             }
             break;
@@ -63,11 +63,14 @@ class Grouper
     /**
      * @param array $users
      * @param $grouperGroup
+     * @param bool $replaceExisting
      * @return bool
      * @throws GrouperException
      */
-    public function addUsersToGroup(array $users, $grouperGroup)
+    public function addUsersToGroup(array $users, $grouperGroup, $replaceExisting=false)
     {
+
+        $replaceExisting = ($replaceExisting === true ? 'T' : 'F');
 
         $subjectLookups = [];
         foreach ($users as $user) {
@@ -76,7 +79,7 @@ class Grouper
 
         $addMembers = [
             'WsRestAddMemberRequest' => [
-                'replaceAllExisting' => 'F',
+                'replaceAllExisting' => $replaceExisting,
                 'subjectLookups' => $subjectLookups,
             ],
         ];
