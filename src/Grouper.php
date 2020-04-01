@@ -55,7 +55,7 @@ class Grouper
                 throw new GrouperException("Unexpected Error to Grouper", 0, $e);
             }
             break;
-        } while ($attempts < $maxAttempts);
+        } while ($attempts < $this->maxAttempts);
 
         return json_decode($response->getBody());
     }
