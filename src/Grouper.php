@@ -18,6 +18,7 @@ class Grouper
     public $maxAttempts = 3;
     public $maxChangesPerQuery = 50;
     public $sleepBetweenChanges = 5;
+    public $debug = false;
 
     public function __construct(Client $client)
     {
@@ -87,7 +88,10 @@ class Grouper
 
             // Get the next portion of users
             $usersThisRound = array_slice($users, $start, $increment);
-//            echo "Doing Loop $start/$increment: ".count($usersThisRound).PHP_EOL;
+            if ($this->debug) {
+                echo "Doing Loop $start/$increment: ".count($usersThisRound).PHP_EOL;
+            }
+
             if (!count($usersThisRound)) {
                 // We're done
                 break;
@@ -149,7 +153,10 @@ class Grouper
         do {
 
             $usersThisRound = array_slice($users, $start, $increment);
-//            echo "Doing Loop $start/$increment: ".count($usersThisRound).PHP_EOL;
+            if ($this->debug) {
+                echo "Doing Loop $start/$increment: " . count($usersThisRound) . PHP_EOL;
+            }
+
             if (!count($usersThisRound)) {
                 // We're done
                 break;
