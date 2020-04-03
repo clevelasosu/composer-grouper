@@ -16,6 +16,8 @@ class Grouper
     protected $client;
     public $timeout = 5;
     public $maxAttempts = 3;
+    public $maxChangesPerQuery = 50;
+    public $sleepBetweenChanges = 5;
 
     public function __construct(Client $client)
     {
@@ -71,30 +73,65 @@ class Grouper
     {
 
         $replaceExisting = ($replaceExisting === true ? 'T' : 'F');
-
-        $subjectLookups = [];
-        foreach ($users as $user) {
-            $subjectLookups[] = ['subjectId' => $user];
-        }
-
-        $addMembers = [
-            'WsRestAddMemberRequest' => [
-                'replaceAllExisting' => $replaceExisting,
-                'subjectLookups' => $subjectLookups,
-            ],
-        ];
-
-        $addMembers = json_encode($addMembers, JSON_PRETTY_PRINT);
         $url = urlencode($grouperGroup) . '/members';
 
-        $result = $this->request($url, 'POST', $addMembers);
-        $resultMetadata = $result->WsAddMemberResults->resultMetadata;
+        $start = 0;
+        $increment = $this->maxChangesPerQuery;
+        $sleep = $this->sleepBetweenChanges;
 
-        if ($resultMetadata->success == 'T') {
-            return true;
-        } else {
-            throw new GrouperException($resultMetadata->resultCode);
-        }
+        do {
+            // Only do a replace the first time around
+            if ($replaceExisting == "T" AND $start > 0) {
+                $replaceExisting = "F";
+            }
+
+            // Get the next portion of users
+            $usersThisRound = array_slice($users, $start, $increment);
+//            echo "Doing Loop $start/$increment: ".count($usersThisRound).PHP_EOL;
+            if (!count($usersThisRound)) {
+                // We're done
+                break;
+            }
+
+            $subjectLookups = [];
+            foreach ($usersThisRound as $user) {
+                $subjectLookups[] = ['subjectId' => $user];
+            }
+
+            $addMembers = [
+                'WsRestAddMemberRequest' => [
+                    'replaceAllExisting' => $replaceExisting,
+                    'subjectLookups' => $subjectLookups,
+                ],
+            ];
+
+            $addMembers = json_encode($addMembers, JSON_PRETTY_PRINT);
+
+            // Make the real request
+            $result = $this->request($url, 'POST', $addMembers);
+            $resultMetadata = $result->WsAddMemberResults->resultMetadata;
+
+            // If it's not successful, throw an error.  Otherwise the loop continues
+            if ($resultMetadata->success != 'T') {
+                throw new GrouperException($resultMetadata->resultCode);
+            }
+
+            // If we have fewer than a full $increment in the array, we should be done
+            if (count($usersThisRound) < $increment) {
+                break;
+            }
+
+            // Prepare for next loop
+            $start += $increment;
+
+            // If it's deemed beneficial to sleep between loops, do it here
+            if ($sleep AND is_numeric($sleep)) {
+                sleep($sleep);
+            }
+
+        } while (true);
+
+        return true;
     }
 
     /**
@@ -105,29 +142,56 @@ class Grouper
      */
     public function removeUsersFromGroup(array $users, $grouperGroup)
     {
+        $start = 0;
+        $increment = $this->maxChangesPerQuery;
+        $sleep = $this->sleepBetweenChanges;
 
-        $subjectLookups = [];
-        foreach ($users as $user) {
-            $subjectLookups[] = ['subjectId' => $user];
-        }
+        do {
 
-        $delMembers = [
-            'WsRestDeleteMemberRequest' => [
-                'subjectLookups' => $subjectLookups,
-            ],
-        ];
+            $usersThisRound = array_slice($users, $start, $increment);
+//            echo "Doing Loop $start/$increment: ".count($usersThisRound).PHP_EOL;
+            if (!count($usersThisRound)) {
+                // We're done
+                break;
+            }
 
-        $delMembers = json_encode($delMembers, JSON_PRETTY_PRINT);
+            $subjectLookups = [];
+            foreach ($usersThisRound as $user) {
+                $subjectLookups[] = ['subjectId' => $user];
+            }
 
-        $url = urlencode($grouperGroup) . '/members';
-        $result = $this->request($url, 'PUT', $delMembers);
+            $delMembers = [
+                'WsRestDeleteMemberRequest' => [
+                    'subjectLookups' => $subjectLookups,
+                ],
+            ];
 
-        $resultMetadata = $result->WsDeleteMemberResults->resultMetadata;
-        if ($resultMetadata->success == 'T') {
-            return true;
-        } else {
-            throw new GrouperException($resultMetadata->resultCode);
-        }
+            $delMembers = json_encode($delMembers, JSON_PRETTY_PRINT);
+
+            $url = urlencode($grouperGroup) . '/members';
+            $result = $this->request($url, 'PUT', $delMembers);
+
+            $resultMetadata = $result->WsDeleteMemberResults->resultMetadata;
+            if ($resultMetadata->success != 'T') {
+                throw new GrouperException($resultMetadata->resultCode);
+            }
+
+            // If we have fewer than a full $increment in the array, we should be done
+            if (count($usersThisRound) < $increment) {
+                break;
+            }
+
+            // Prepare for next loop
+            $start += $increment;
+
+            // If it's deemed beneficial to sleep between loops, do it here
+            if ($sleep AND is_numeric($sleep)) {
+                sleep($sleep);
+            }
+
+        } while (true);
+
+        return true;
     }
 
     /**
