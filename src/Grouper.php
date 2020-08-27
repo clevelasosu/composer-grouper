@@ -20,8 +20,17 @@ class Grouper
     public $sleepBetweenChanges = 5;
     public $debug = false;
 
-    public function __construct(Client $client)
+//    public function __construct(Client $client)
+    public function __construct($url, $login, $pass, $verifySsl=false)
     {
+        $client = new Client([
+            'base_uri' => $url,
+            'auth' => [
+                $login,
+                $pass,
+            ],
+            'verify' => $verifySsl,
+        ]);
         $this->client = $client;
     }
 
@@ -220,7 +229,7 @@ class Grouper
             throw new GrouperException($body->WsGetMembersLiteResult->resultMetadata->resultCode);
         }
 
-        if (count($body->WsGetMembersLiteResult->wsSubjects) == 0) {
+        if (!isset($body->WsGetMembersLiteResult->wsSubjects) OR count($body->WsGetMembersLiteResult->wsSubjects) == 0) {
             return [];
         }
 
