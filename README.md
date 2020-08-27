@@ -2,7 +2,6 @@
 ## Installation
 
 ```bash
-composer config repositories.engrcommon vcs https://nemo.engr.oregonstate.edu/repos/composer/engrcommon
 composer config repositories.grouper vcs https://github.com/clevelasosu/composer-grouper
 
 ```
